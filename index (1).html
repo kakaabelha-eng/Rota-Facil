@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B6E4F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rota Fácil">
+<title>Rota Fácil</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* Layout: app de uma coluna para celular, três abas fixas embaixo (Importar, Rota, Mapa). */
+:root{
+  --bg:#F1F5F2; --surface:#FFFFFF; --ink:#12201B; --muted:#586861; --line:#D7E0DB;
+  --accent:#0B6E4F; --accent-ink:#FFFFFF; --accent-soft:#DDF0E8;
+  --warn:#9A4A06; --warn-soft:#FCEBD3; --done:#7C8D86;
+  --font-display:'Bricolage Grotesque','Inter',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0D1512; --surface:#15211C; --ink:#E6EFEA; --muted:#97ABA2; --line:#24342D;
+    --accent:#3FCF9B; --accent-ink:#04231A; --accent-soft:#163A2D;
+    --warn:#F2B35A; --warn-soft:#33260F; --done:#6F8179;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--font-body);-webkit-text-size-adjust:100%}
+.wrap{max-width:620px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+header.top{display:flex;align-items:center;justify-content:space-between;padding-block:calc(14px + env(safe-area-inset-top,0px)) 10px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand h1{font:800 22px/1 var(--font-display);margin:0;letter-spacing:-.01em}
+.mark{width:32px;height:32px;border-radius:9px;background:var(--accent);display:grid;place-items:center}
+.mark svg{width:20px;height:20px;stroke:var(--accent-ink);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+button,input,textarea{font:inherit;color:inherit}
+.link{background:none;border:0;color:var(--muted);padding:8px 0;font-size:14px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.link.armed{color:var(--warn);font-weight:600}
+h2{font:700 19px/1.2 var(--font-display);margin:0 0 12px;letter-spacing:-.005em}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.step h2{display:flex;align-items:center;gap:10px}
+.n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 14px/1 var(--font-body)}
+label{display:block;font-size:14px;font-weight:600;margin:12px 0 6px}
+label.check{display:flex;gap:10px;align-items:center;font-weight:500;margin-top:14px}
+input[type=text],textarea{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:12px;font-size:16px}
+textarea{resize:vertical;min-height:180px;line-height:1.5}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{font-size:13px;color:var(--muted);margin:8px 0 0}
+.hint.bad{color:var(--warn);font-weight:600}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:16px;text-decoration:none;color:var(--ink);cursor:pointer;width:100%}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--warn);border-color:var(--warn)}
+.btn.rec{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.btn.big{min-height:64px;font-size:20px;font-family:var(--font-display)}
+.btn[disabled]{opacity:.5;cursor:default}
+.btn+.btn,.btn+.hint{margin-top:10px}
+.nav-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.nav-row .btn{min-height:44px;font-size:15px}
+.progress{margin-top:14px}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .25s}
+.progress p{margin:6px 0 0;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.result{margin-top:14px}
+.result .counts{display:flex;gap:16px;font-weight:600;font-variant-numeric:tabular-nums;margin-bottom:10px}
+.result .counts .bad{color:var(--warn)}
+.fail{border-top:1px solid var(--line);padding:12px 0}
+.fail input{margin-bottom:8px}
+.fail .acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mini{min-height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:transparent;font-size:14px;font-weight:600;cursor:pointer}
+.mini.warn{color:var(--warn);border-color:var(--warn)}
+/* Rota */
+.summary{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-variant-numeric:tabular-nums;margin-bottom:8px}
+.summary strong{font:800 26px/1 var(--font-display)}
+.summary .km{font-size:14px;color:var(--muted)}
+.current{background:var(--surface);border:2px solid var(--accent);border-radius:16px;padding:18px;margin:16px 0}
+.eyebrow{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent)}
+.addr-big{font:700 24px/1.2 var(--font-display);margin:8px 0 4px;overflow-wrap:anywhere;text-wrap:balance}
+.sub{color:var(--muted);font-size:15px;margin:2px 0}
+.sub.warn,.note{color:var(--warn)}
+.note{background:var(--warn-soft);padding:8px 10px;border-radius:8px;font-size:14px;margin:10px 0 0}
+.current .btn.big{margin-top:14px}
+.list-title{display:flex;justify-content:space-between;align-items:baseline;margin:22px 0 6px}
+.list-title h3{font:700 16px/1 var(--font-display);margin:0}
+ul.stops{list-style:none;margin:0;padding:0}
+.row-stop{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.num{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font:700 13px/1 var(--font-body);font-variant-numeric:tabular-nums}
+.row-stop.is-done .num{background:var(--line);color:var(--done)}
+.row-stop.is-done .addr{color:var(--muted);text-decoration:line-through}
+.row-stop .info{min-width:0}
+.addr{font-weight:500;overflow-wrap:anywhere}
+details{border-top:1px solid var(--line);margin-top:18px;padding-top:12px}
+summary{font:700 16px/1.2 var(--font-display);cursor:pointer;padding:6px 0}
+.empty{text-align:center;padding:36px 8px;color:var(--muted)}
+.empty h2{color:var(--ink)}
+.empty .btn{max-width:280px;margin:16px auto 0}
+.done-panel{background:var(--accent-soft);border-radius:16px;padding:20px;margin:16px 0}
+/* Mapa */
+#tab-map{position:relative}
+#map{height:calc(100dvh - 200px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));min-height:320px;border-radius:14px;border:1px solid var(--line);overflow:hidden;background:var(--surface)}
+#map .pad{padding:20px}
+#map-banner{position:absolute;z-index:500;left:10px;right:10px;top:10px;background:var(--ink);color:var(--bg);padding:10px 12px;border-radius:10px;display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:14px}
+#map-banner button{background:transparent;border:1px solid currentColor;color:inherit;border-radius:8px;padding:6px 10px;font-weight:600}
+.pin{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:700 12px/1 'Inter',system-ui,sans-serif;color:#fff;background:#0B6E4F;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.pin.done{background:#7C8D86}
+.pin.failed{background:#B45309}
+.pin.start{background:#12201B}
+.pin.current{box-shadow:0 0 0 5px rgba(11,110,79,.35),0 1px 4px rgba(0,0,0,.4)}
+.leaflet-popup-content{font:14px/1.4 'Inter',system-ui,sans-serif;color:#12201B}
+.leaflet-popup-content a{display:inline-block;margin-top:6px;font-weight:600;color:#0B6E4F}
+/* Navegação e aviso */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:900;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+nav.tabs button{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;min-height:52px}
+nav.tabs svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button[aria-current=page]{color:var(--accent)}
+#toast{position:fixed;z-index:1000;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:12px;display:flex;gap:14px;align-items:center;max-width:calc(100% - 32px);font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+#toast button{background:none;border:0;color:inherit;font-weight:700;text-decoration:underline;font-size:15px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h6a3 3 0 0 0 0-6h-4a3 3 0 0 1 0-6h6"/></svg></span>
+      <h1>Rota Fácil</h1>
+    </div>
+    <button class="link" id="btn-reset" type="button">Nova rota</button>
+  </header>
+
+  <main>
+    <section id="tab-import" class="tab" aria-label="Importar endereços">
+      <div class="step">
+        <h2><span class="n">1</span>Ponto de saída</h2>
+        <label for="start-addr">Endereço do depósito ou de onde você sai</label>
+        <input type="text" id="start-addr" placeholder="Ex.: Rua Augusta, 1500, São Paulo" autocomplete="off">
+        <button class="btn ghost" id="btn-gps" type="button" style="margin-top:10px">Usar minha localização agora</button>
+        <p class="hint" id="start-status"></p>
+      </div>
+
+      <div class="step">
+        <h2><span class="n">2</span>Endereços do dia</h2>
+        <label for="city">Cidade padrão</label>
+        <input type="text" id="city" placeholder="Ex.: São Paulo, SP" autocomplete="off">
+        <p class="hint">Entra no fim dos endereços que não trazem a cidade.</p>
+        <button class="btn ghost" id="btn-voice" type="button" style="margin-top:14px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Falar endereços</button>
+        <p class="hint" id="voice-live" aria-live="polite">Fale um endereço por vez. Diga “apagar último” para corrigir e “montar rota” para terminar.</p>
+        <label for="raw">Um endereço por linha</label>
+        <textarea id="raw" spellcheck="false" placeholder="Rua Augusta, 1500, Consolação ; Maria&#10;Av. Paulista, 900 ; Pedido 8841&#10;-23.5614, -46.6559 ; deixar na portaria"></textarea>
+        <p class="hint">Depois do “;” você anota cliente ou observação. Coordenadas (latitude, longitude) também funcionam.</p>
+        <label class="check"><input type="checkbox" id="closed"> Voltar ao ponto de saída no final</label>
+      </div>
+
+      <div class="step">
+        <h2><span class="n">3</span>Localizar e montar a rota</h2>
+        <button class="btn primary" id="btn-geo" type="button">Localizar endereços</button>
+        <div class="progress" id="geo-progress" hidden>
+          <div class="bar"><i id="geo-bar" style="width:0%"></i></div>
+          <p id="geo-text"></p>
+          <button class="btn ghost" id="btn-stop" type="button" style="margin-top:10px;min-height:40px">Parar</button>
+        </div>
+        <div class="result" id="geo-result"></div>
+      </div>
+    </section>
+
+    <section id="tab-route" class="tab" aria-label="Rota" hidden></section>
+
+    <section id="tab-map" class="tab" aria-label="Mapa" hidden>
+      <div id="map-banner" hidden><span id="map-banner-text"></span><button type="button" data-act="place-cancel">Cancelar</button></div>
+      <div id="map"></div>
+    </section>
+  </main>
+</div>
+
+<nav class="tabs" aria-label="Seções">
+  <button type="button" data-tab="import" aria-current="page"><svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L8 8m4-4 4 4M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>Importar</button>
+  <button type="button" data-tab="route"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>Rota</button>
+  <button type="button" data-tab="map"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Mapa</button>
+</nav>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(() => {
+'use strict';
+
+/* ================= utilidades ================= */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const rid = () => Math.random().toString(36).slice(2, 9);
+const fmtKm = m => (m / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 1});
+const COORD = /^(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)$/;
+const CIRCUITY = 1.3; // ruas não são linha reta: estimativa de km = linha reta x 1,3
+
+/* ================= estado ================= */
+const KEY = 'rotafacil.v1';
+const fresh = () => ({stops: [], order: [], start: null, city: '', raw: '', closed: false, cache: {}});
+let S = fresh();
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+function load() {
+  try { const j = localStorage.getItem(KEY); if (j) S = Object.assign(fresh(), JSON.parse(j)); } catch (e) {}
+}
+const byId = id => S.stops.find(s => s.id === id);
+
+/* ================= distância e otimização ================= */
+const R = 6371000, rad = x => x * Math.PI / 180;
+function hav(a, b) {
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/* OTIMIZADOR_INICIO
+   Recebe o ponto de partida, a lista de paradas e (opcional) o ponto final fixo.
+   Devolve a ordem das paradas como índices de pts. Vizinho mais próximo + 2-opt + Or-opt. */
+function optimize(startPt, pts, endPt) {
+  const n = pts.length;
+  if (n <= 1) return pts.map((_, i) => i);
+  const nodes = [startPt, ...pts];
+  if (endPt) nodes.push(endPt);
+  const m = nodes.length;
+  const D = new Float64Array(m * m);
+  for (let i = 0; i < m; i++) for (let j = i + 1; j < m; j++) { const v = hav(nodes[i], nodes[j]); D[i * m + j] = v; D[j * m + i] = v; }
+  const d = (a, b) => D[a * m + b];
+
+  let path = [0];
+  const used = new Uint8Array(m); used[0] = 1;
+  for (let k = 0; k < n; k++) {
+    const last = path[path.length - 1];
+    let best = -1, bd = Infinity;
+    for (let j = 1; j <= n; j++) if (!used[j] && d(last, j) < bd) { bd = d(last, j); best = j; }
+    used[best] = 1; path.push(best);
+  }
+  if (endPt) path.push(n + 1);
+  const L = path.length;
+  const lastFree = endPt ? L - 2 : L - 1;
+
+  let improved = true, guard = 0;
+  while (improved && guard++ < 40) {
+    improved = false;
+    // 2-opt
+    for (let i = 1; i < lastFree; i++) {
+      for (let j = i + 1; j <= lastFree; j++) {
+        const a = path[i - 1], b = path[i], c = path[j], e = j + 1 < L ? path[j + 1] : -1;
+        let delta = d(a, c) - d(a, b);
+        if (e >= 0) delta += d(b, e) - d(c, e);
+        if (delta < -1e-6) {
+          for (let x = i, y = j; x < y; x++, y--) { const t = path[x]; path[x] = path[y]; path[y] = t; }
+          improved = true;
+        }
+      }
+    }
+    // Or-opt: move trechos de 1 a 3 paradas para outro lugar
+    for (let seg = 1; seg <= 3; seg++) {
+      for (let i = 1; i + seg - 1 <= lastFree; i++) {
+        const s = path.slice(i, i + seg), p = path[i - 1], q = i + seg < L ? path[i + seg] : -1;
+        const rem = -d(p, s[0]) + (q >= 0 ? d(p, q) - d(s[seg - 1], q) : 0);
+        const rest = path.slice(0, i).concat(path.slice(i + seg));
+        const kmax = endPt ? rest.length - 1 : rest.length;
+        let bestD = -1e-6, bk = -1, brev = false;
+        for (let k = 1; k <= kmax; k++) {
+          const u = rest[k - 1], v = k < rest.length ? rest[k] : -1;
+          for (let r = 0; r < 2; r++) {
+            const x0 = r ? s[seg - 1] : s[0], x1 = r ? s[0] : s[seg - 1];
+            const tot = rem + d(u, x0) + (v >= 0 ? d(x1, v) - d(u, v) : 0);
+            if (tot < bestD) { bestD = tot; bk = k; brev = !!r; }
+          }
+        }
+        if (bk >= 0) { rest.splice(bk, 0, ...(brev ? s.slice().reverse() : s)); path = rest; improved = true; }
+      }
+    }
+  }
+  return path.slice(1, n + 1).map(i => i - 1);
+}
+/* OTIMIZADOR_FIM */
+
+/* ================= abas ================= */
+let tab = 'import';
+function show(t) {
+  tab = t;
+  ['import', 'route', 'map'].forEach(k => { $('#tab-' + k).hidden = k !== t; });
+  document.querySelectorAll('nav.tabs button').forEach(b => {
+    if (b.dataset.tab === t) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+  if (t === 'route') renderRoute();
+  if (t === 'map') { renderMap(true); }
+  window.scrollTo({top: 0});
+}
+
+/* ================= aviso (toast) ================= */
+let toastTimer = null;
+function toast(msg, undo) {
+  const el = $('#toast');
+  el.innerHTML = `<span>${esc(msg)}</span>` + (undo ? '<button type="button">Desfazer</button>' : '');
+  el.hidden = false;
+  if (undo) $('button', el).onclick = () => { undo(); el.hidden = true; };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, undo ? 7000 : 3000);
+}
+
+/* ================= leitura da lista ================= */
+const cityHead = () => S.city.split(',')[0].trim().toLowerCase();
+const needsCity = a => S.city.trim() && !a.toLowerCase().includes(cityHead());
+
+function parseRaw() {
+  const out = [];
+  S.raw.split('\n').forEach(line => {
+    line = line.trim(); if (!line) return;
+    const parts = line.split(/[;|]/).map(x => x.trim());
+    const addr = parts[0]; if (!addr) return;
+    const label = parts.slice(1).filter(Boolean).join(' · ');
+    const m = addr.match(COORD);
+    out.push({
+      addr, label,
+      coords: m ? {lat: +m[1], lng: +m[2]} : null,
+      query: (!m && needsCity(addr)) ? addr + ', ' + S.city.trim() : addr
+    });
+  });
+  return out;
+}
+
+function mergeStops(parsed) {
+  const pool = {};
+  S.stops.forEach(s => { (pool[s.addr + '|' + s.label + '|' + s.query] ||= []).push(s); });
+  const next = parsed.map(p => {
+    const hit = (pool[p.addr + '|' + p.label + '|' + p.query] || []).shift();
+    if (hit) return hit;
+    const s = {id: rid(), addr: p.addr, label: p.label, query: p.query, status: 'new'};
+    if (p.coords) { s.lat = p.coords.lat; s.lng = p.coords.lng; s.status = 'pending'; }
+    return s;
+  });
+  const keep = new Set(next.map(s => s.id));
+  S.order = S.order.filter(id => keep.has(id));
+  return next;
+}
+
+/* ================= geocodificação (Nominatim / OpenStreetMap) ================= */
+async function geocodeOne(q, bias) {
+  const u = new URL('https://nominatim.openstreetmap.org/search');
+  u.searchParams.set('format', 'jsonv2');
+  u.searchParams.set('limit', '1');
+  u.searchParams.set('countrycodes', 'br');
+  u.searchParams.set('accept-language', 'pt-BR');
+  u.searchParams.set('q', q);
+  if (bias) { const dx = 0.6; u.searchParams.set('viewbox', `${bias.lng - dx},${bias.lat + dx},${bias.lng + dx},${bias.lat - dx}`); }
+  let r = await fetch(u);
+  if (r.status === 429) { await sleep(5000); r = await fetch(u); }
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  return j[0] ? {lat: +j[0].lat, lng: +j[0].lon, name: j[0].display_name} : null;
+}
+
+function apply(s, c) {
+  s.lat = c.lat; s.lng = c.lng; s.approx = !!c.approx;
+  if (s.status !== 'done' && s.status !== 'failed') s.status = 'pending';
+}
+
+/* devolve true se usou a rede (para respeitar 1 consulta por segundo) */
+async function locate(s) {
+  if (s.lat != null) return false;
+  const c = S.cache[s.query];
+  if (c) { apply(s, c); return false; }
+  let res = await geocodeOne(s.query, S.start), approx = false;
+  if (!res) {
+    const q2 = s.query.replace(/,\s*(n[º°o.]*\s*)?\d+[A-Za-z]?\b/i, '');
+    if (q2 !== s.query) { await sleep(1100); res = await geocodeOne(q2, S.start); approx = true; }
+  }
+  if (res) { const c2 = {lat: res.lat, lng: res.lng, approx}; S.cache[s.query] = c2; apply(s, c2); }
+  else s.status = 'unlocated';
+  return true;
+}
+
+let geoRunning = false, geoCancel = false;
+async function geocodeAll() {
+  if (geoRunning) return;
+  if (!navigator.onLine) { toast('Sem internet. Conecte e tente de novo.'); return; }
+  geoRunning = true; geoCancel = false;
+  $('#btn-geo').disabled = true;
+  S.stops = mergeStops(parseRaw());
+
+  const t = $('#start-addr').value.trim();
+  if (t && (!S.start || S.start.label !== t)) {
+    setStartStatus('Procurando o ponto de saída…');
+    try {
+      const r = await geocodeOne(needsCity(t) ? t + ', ' + S.city.trim() : t, null);
+      if (!r) { setStartStatus('Não achei o endereço de saída. Confira o texto ou use sua localização.', true); return endGeo(); }
+      S.start = {lat: r.lat, lng: r.lng, label: t};
+      await sleep(1100);
+    } catch (e) { setStartStatus('Falha ao buscar a saída. Verifique a conexão.', true); return endGeo(); }
+  }
+  renderStart();
+
+  const todo = S.stops.filter(s => s.lat == null);
+  const prog = $('#geo-progress'); prog.hidden = false;
+  let doneN = 0, errors = 0;
+  for (const s of todo) {
+    if (geoCancel) break;
+    try {
+      const net = await locate(s);
+      errors = 0;
+      doneN++;
+      updateProgress(doneN, todo.length);
+      if (net) await sleep(1100);
+    } catch (e) {
+      s.status = 'unlocated';
+      if (++errors >= 3) { toast('A busca parou: confira a internet e tente de novo.'); break; }
+      await sleep(1500);
+    }
+    if (doneN % 10 === 0) save();
+  }
+  save(); endGeo();
+
+  const bad = S.stops.filter(s => s.status === 'unlocated' || s.status === 'new').length;
+  if (!geoCancel && !bad && S.stops.length && S.start) buildRoute();
+}
+function endGeo() {
+  geoRunning = false; $('#btn-geo').disabled = false;
+  $('#geo-progress').hidden = true;
+  save(); renderGeoResult();
+}
+function updateProgress(i, total) {
+  $('#geo-bar').style.width = (100 * i / total) + '%';
+  const sec = Math.ceil((total - i) * 1.1);
+  $('#geo-text').textContent = `Localizando ${i} de ${total}` + (sec > 5 ? ` · cerca de ${sec >= 90 ? Math.ceil(sec / 60) + ' min' : sec + ' s'} restantes` : '');
+}
+
+/* ================= ponto de saída ================= */
+function setStartStatus(msg, bad) { const el = $('#start-status'); el.textContent = msg; el.className = 'hint' + (bad ? ' bad' : ''); }
+function renderStart() {
+  if (S.start) setStartStatus('Saída definida: ' + (S.start.label || 'ponto no mapa'));
+  else setStartStatus('');
+}
+function getPos() {
+  return new Promise((res, rej) => {
+    if (!navigator.geolocation) return rej(new Error('sem gps'));
+    navigator.geolocation.getCurrentPosition(
+      p => res({lat: p.coords.latitude, lng: p.coords.longitude}), rej,
+      {enableHighAccuracy: true, timeout: 12000, maximumAge: 30000});
+  });
+}
+
+/* ================= resultado da localização ================= */
+function renderGeoResult() {
+  const el = $('#geo-result');
+  if (!S.stops.length) { el.innerHTML = ''; return; }
+  const ok = S.stops.filter(s => s.lat != null);
+  const bad = S.stops.filter(s => s.lat == null);
+  const approx = ok.filter(s => s.approx).length;
+  let h = `<div class="counts"><span>${ok.length} encontrados</span>` + (bad.length ? `<span class="bad">${bad.length} não encontrados</span>` : '') + '</div>';
+  if (approx) h += `<p class="hint">${approx} ficaram com posição aproximada (só a rua). Eles aparecem com aviso na hora da entrega.</p>`;
+  if (!S.start) h += '<p class="hint bad">Defina o ponto de saída no passo 1 para montar a rota.</p>';
+  if (ok.length) h += `<button class="btn primary" type="button" data-act="build" ${S.start ? '' : 'disabled'} style="margin-top:12px">${S.order.length ? 'Remontar' : 'Montar'} a rota com ${ok.filter(s => s.status === 'pending').length} paradas</button>`;
+  bad.forEach(s => {
+    h += `<div class="fail" data-id="${s.id}"><input type="text" value="${esc(s.addr)}" aria-label="Corrigir endereço"><div class="acts">
+      <button class="mini" type="button" data-act="retry" data-id="${s.id}">Buscar de novo</button>
+      <button class="mini" type="button" data-act="place" data-id="${s.id}">Marcar no mapa</button>
+      <button class="mini warn" type="button" data-act="remove" data-id="${s.id}">Remover</button></div></div>`;
+  });
+  el.innerHTML = h;
+}
+
+/* ================= montar e reorganizar a rota ================= */
+function planPending(from) {
+  const pend = S.stops.filter(s => s.status === 'pending' && s.lat != null);
+  const idx = optimize(from, pend, (S.closed && S.start) ? S.start : null);
+  const keep = S.order.filter(id => { const s = byId(id); return s && s.status !== 'pending'; });
+  S.order = [...keep, ...idx.map(k => pend[k].id)];
+}
+function buildRoute() {
+  if (!S.start) { toast('Defina o ponto de saída primeiro.'); return; }
+  planPending(S.start);
+  save(); renderGeoResult(); show('route');
+}
+
+/* ================= tela da Rota ================= */
+let showAll = false;
+const gmaps = s => 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + (s.approx ? encodeURIComponent(s.query) : s.lat + ',' + s.lng);
+const waze = s => 'https://waze.com/ul?navigate=yes&zoom=17&ll=' + s.lat + ',' + s.lng;
+const currentStop = () => S.order.map(byId).find(s => s && s.status === 'pending') || null;
+
+function remainingMeters(pending) {
+  const lastDone = [...S.order].reverse().map(byId).find(s => s && s.status === 'done');
+  let pos = lastDone ? {lat: lastDone.lat, lng: lastDone.lng} : S.start;
+  if (!pos) return 0;
+  let m = 0;
+  pending.forEach(s => { m += hav(pos, s); pos = s; });
+  if (S.closed && S.start) m += hav(pos, S.start);
+  return m * CIRCUITY;
+}
+
+function renderRoute() {
+  const el = $('#tab-route');
+  const ordered = S.order.map(byId).filter(Boolean);
+  if (!ordered.length) {
+    el.innerHTML = `<div class="empty"><h2>Nenhuma rota ainda</h2><p>Cole os endereços, localize e monte a rota. Ela aparece aqui, parada por parada.</p><button class="btn primary" type="button" data-tab="import">Ir para Importar</button></div>`;
+    return;
+  }
+  const pending = ordered.filter(s => s.status === 'pending');
+  const done = ordered.filter(s => s.status === 'done');
+  const failed = ordered.filter(s => s.status === 'failed');
+  const total = ordered.length;
+  const pct = Math.round(100 * done.length / total);
+  const cur = pending[0];
+  let h = `<div class="summary"><div><strong>${done.length}</strong> de ${total} entregues</div><div class="km">${pending.length ? '≈ ' + fmtKm(remainingMeters(pending)) + ' km restantes' : ''}</div></div>
+    <div class="bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>`;
+
+  if (cur) {
+    const n = S.order.indexOf(cur.id) + 1;
+    h += `<article class="current">
+      <div class="eyebrow">Próxima parada · ${n} de ${total}</div>
+      <h2 class="addr-big">${esc(cur.addr)}</h2>
+      ${cur.label ? `<p class="sub">${esc(cur.label)}</p>` : ''}
+      ${cur.approx ? '<p class="note">Posição aproximada: confira o número quando chegar.</p>' : ''}
+      <div class="nav-row">
+        <a class="btn ghost" target="_blank" rel="noopener" href="${gmaps(cur)}">Google Maps</a>
+        <a class="btn ghost" target="_blank" rel="noopener" href="${waze(cur)}">Waze</a>
+      </div>
+      <button class="btn primary big" type="button" data-act="done" data-id="${cur.id}">Entregue</button>
+      <div class="nav-row">
+        <button class="btn ghost" type="button" data-act="later" data-id="${cur.id}">Deixar para depois</button>
+        <button class="btn ghost danger" type="button" data-act="fail" data-id="${cur.id}">Não entreguei</button>
+      </div>
+    </article>`;
+  } else {
+    h += `<div class="done-panel"><h2>Rota concluída</h2><p>${done.length} entregas feitas${failed.length ? ` e ${failed.length} sem entrega. Veja abaixo para tentar de novo.` : '.'}</p></div>`;
+  }
+
+  const upcoming = pending.slice(1);
+  if (upcoming.length) {
+    const shown = showAll ? upcoming : upcoming.slice(0, 25);
+    h += `<div class="list-title"><h3>Depois dessa (${upcoming.length})</h3><button class="link" type="button" data-act="reopt">Reotimizar a partir de onde estou</button></div><ul class="stops">`;
+    shown.forEach(s => {
+      h += `<li class="row-stop"><span class="num">${S.order.indexOf(s.id) + 1}</span><div class="info"><div class="addr">${esc(s.addr)}</div>${s.label ? `<div class="sub">${esc(s.label)}</div>` : ''}${s.approx ? '<div class="sub warn">Posição aproximada</div>' : ''}</div><button class="mini" type="button" data-act="now" data-id="${s.id}">Fazer agora</button></li>`;
+    });
+    h += '</ul>';
+    if (!showAll && upcoming.length > shown.length) h += `<button class="btn ghost" type="button" data-act="showall" style="margin-top:12px">Mostrar todas as ${upcoming.length}</button>`;
+  }
+
+  if (failed.length) {
+    h += `<details open><summary>Não entregues (${failed.length})</summary><ul class="stops">`;
+    failed.forEach(s => { h += `<li class="row-stop"><span class="num">${S.order.indexOf(s.id) + 1}</span><div class="info"><div class="addr">${esc(s.addr)}</div>${s.label ? `<div class="sub">${esc(s.label)}</div>` : ''}</div><button class="mini" type="button" data-act="retryfail" data-id="${s.id}">Tentar de novo</button></li>`; });
+    h += '</ul></details>';
+  }
+  if (done.length) {
+    h += `<details><summary>Entregues (${done.length})</summary><ul class="stops">`;
+    done.slice().reverse().forEach(s => { h += `<li class="row-stop is-done"><span class="num">${S.order.indexOf(s.id) + 1}</span><div class="info"><div class="addr">${esc(s.addr)}</div>${s.label ? `<div class="sub">${esc(s.label)}</div>` : ''}</div><button class="mini" type="button" data-act="undo" data-id="${s.id}">Desfazer</button></li>`; });
+    h += '</ul></details>';
+  }
+  el.innerHTML = h;
+}
+
+/* ações da rota */
+function snapshot() { return {order: S.order.slice(), st: Object.fromEntries(S.stops.map(s => [s.id, s.status]))}; }
+function restore(sn) { S.order = sn.order; S.stops.forEach(s => { if (sn.st[s.id]) s.status = sn.st[s.id]; }); save(); renderAll(); }
+function moveToFront(id) {
+  S.order = S.order.filter(x => x !== id);
+  const firstPending = S.order.findIndex(x => { const s = byId(x); return s && s.status === 'pending'; });
+  if (firstPending < 0) S.order.push(id); else S.order.splice(firstPending, 0, id);
+}
+function setStatus(id, status, msg) {
+  const sn = snapshot(), s = byId(id); if (!s) return;
+  s.status = status; save(); renderAll();
+  try { navigator.vibrate && navigator.vibrate(25); } catch (e) {}
+  toast(msg, () => restore(sn));
+}
+async function reopt() {
+  const pend = S.stops.filter(s => s.status === 'pending' && s.lat != null);
+  if (pend.length < 2) { toast('Poucas paradas para reorganizar.'); return; }
+  const sn = snapshot();
+  let from = null;
+  try { from = await getPos(); } catch (e) {}
+  if (!from) {
+    const last = [...S.order].reverse().map(byId).find(s => s && s.status === 'done');
+    from = last ? {lat: last.lat, lng: last.lng} : S.start;
+  }
+  planPending(from); save(); renderAll();
+  toast('Rota reorganizada a partir de onde você está.', () => restore(sn));
+}
+
+/* ================= mapa ================= */
+let map = null, layer = null, placing = null;
+function ensureMap() {
+  if (map) return true;
+  if (typeof L === 'undefined') { $('#map').innerHTML = '<p class="pad">Não consegui carregar o mapa. Verifique a internet e abra de novo.</p>'; return false; }
+  map = L.map('map').setView([-15.78, -47.93], 4);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '© OpenStreetMap'}).addTo(map);
+  layer = L.layerGroup().addTo(map);
+  map.on('click', onMapClick);
+  return true;
+}
+function pinIcon(txt, cls) { return L.divIcon({className: '', html: `<div class="pin ${cls}">${esc(txt)}</div>`, iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14]}); }
+function renderMap(fit) {
+  if (!ensureMap()) return;
+  map.invalidateSize();
+  layer.clearLayers();
+  const cur = currentStop(), bounds = [];
+  if (S.start) {
+    L.marker([S.start.lat, S.start.lng], {icon: pinIcon('S', 'start')}).addTo(layer).bindPopup('Ponto de saída');
+    bounds.push([S.start.lat, S.start.lng]);
+  }
+  S.stops.forEach(s => {
+    if (s.lat == null) return;
+    const idx = S.order.indexOf(s.id);
+    let cls = s.status === 'done' ? 'done' : s.status === 'failed' ? 'failed' : '';
+    if (cur && cur.id === s.id) cls += ' current';
+    const pop = `<strong>${idx >= 0 ? idx + 1 + '. ' : ''}${esc(s.addr)}</strong>${s.label ? '<br>' + esc(s.label) : ''}<br><a target="_blank" rel="noopener" href="${gmaps(s)}">Abrir no Google Maps</a>`;
+    L.marker([s.lat, s.lng], {icon: pinIcon(idx >= 0 ? idx + 1 : '•', cls)}).addTo(layer).bindPopup(pop);
+    bounds.push([s.lat, s.lng]);
+  });
+  const line = [];
+  if (S.start) line.push([S.start.lat, S.start.lng]);
+  S.order.map(byId).filter(s => s && s.status === 'pending').forEach(s => line.push([s.lat, s.lng]));
+  if (S.closed && S.start && line.length > 1) line.push([S.start.lat, S.start.lng]);
+  if (line.length > 1) L.polyline(line, {color: '#0B6E4F', weight: 3, opacity: .75, dashArray: '6 6'}).addTo(layer);
+  if (fit && bounds.length) map.fitBounds(bounds, {padding: [30, 30], maxZoom: 16});
+  updateBanner();
+}
+function updateBanner() {
+  const b = $('#map-banner');
+  if (!placing) { b.hidden = true; return; }
+  const s = byId(placing);
+  $('#map-banner-text').textContent = 'Toque no mapa para marcar: ' + (s ? s.addr : '');
+  b.hidden = false;
+}
+function onMapClick(e) {
+  if (!placing) return;
+  const s = byId(placing); placing = null;
+  if (s) {
+    s.lat = e.latlng.lat; s.lng = e.latlng.lng; s.approx = false;
+    if (s.status === 'unlocated' || s.status === 'new') s.status = 'pending';
+    S.cache[s.query] = {lat: s.lat, lng: s.lng, approx: false};
+    if (S.order.length && s.status === 'pending' && !S.order.includes(s.id)) S.order.push(s.id);
+    save(); toast('Endereço marcado no mapa.');
+  }
+  renderAll();
+}
+
+/* ================= renderização geral ================= */
+function renderAll() {
+  renderGeoResult();
+  if (tab === 'route') renderRoute();
+  if (tab === 'map') renderMap(false);
+}
+
+/* ================= eventos ================= */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tab]');
+  if (t) { show(t.dataset.tab); return; }
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const id = b.dataset.id;
+  switch (b.dataset.act) {
+    case 'build': buildRoute(); break;
+    case 'done': setStatus(id, 'done', 'Entrega registrada.'); break;
+    case 'fail': setStatus(id, 'failed', 'Marcada como não entregue.'); break;
+    case 'later': {
+      const sn = snapshot(); S.order = S.order.filter(x => x !== id); S.order.push(id);
+      save(); renderAll(); toast('Parada movida para o fim.', () => restore(sn)); break;
+    }
+    case 'now': moveToFront(id); save(); renderAll(); window.scrollTo({top: 0, behavior: 'smooth'}); break;
+    case 'undo': { const sn = snapshot(); byId(id).status = 'pending'; moveToFront(id); save(); renderAll(); toast('Voltou para a fila.', () => restore(sn)); break; }
+    case 'retryfail': { const s = byId(id); s.status = 'pending'; S.order = S.order.filter(x => x !== id); S.order.push(id); save(); renderAll(); break; }
+    case 'showall': showAll = true; renderRoute(); break;
+    case 'reopt': reopt(); break;
+    case 'remove': {
+      S.stops = S.stops.filter(s => s.id !== id); S.order = S.order.filter(x => x !== id);
+      const lines = S.raw.split('\n'); // mantém o texto em sincronia
+      const gone = lines.findIndex(l => l.trim().split(/[;|]/)[0].trim() === (b.closest('.fail').querySelector('input').defaultValue));
+      if (gone >= 0) { lines.splice(gone, 1); S.raw = lines.join('\n'); $('#raw').value = S.raw; }
+      save(); renderGeoResult(); break;
+    }
+    case 'retry': {
+      const s = byId(id), v = b.closest('.fail').querySelector('input').value.trim(); if (!s || !v) break;
+      const lines = S.raw.split('\n'); // troca o endereço também na lista de texto
+      const at = lines.findIndex(l => l.trim().split(/[;|]/)[0].trim() === s.addr);
+      if (at >= 0) { const rest = lines[at].includes(';') ? ' ;' + lines[at].split(';').slice(1).join(';') : ''; lines[at] = v + rest; S.raw = lines.join('\n'); $('#raw').value = S.raw; }
+      s.addr = v; s.query = (!v.match(COORD) && needsCity(v)) ? v + ', ' + S.city.trim() : v; s.status = 'new';
+      const m = v.match(COORD); if (m) { s.lat = +m[1]; s.lng = +m[2]; s.status = 'pending'; }
+      save(); b.disabled = true; b.textContent = 'Buscando…';
+      locate(s).catch(() => { s.status = 'unlocated'; }).then(() => { save(); renderGeoResult(); });
+      break;
+    }
+    case 'place': placing = id; show('map'); break;
+    case 'place-cancel': placing = null; updateBanner(); break;
+  }
+});
+
+let saveTimer = null;
+const queueSave = () => { clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); };
+$('#raw').addEventListener('input', e => { S.raw = e.target.value; queueSave(); });
+$('#city').addEventListener('input', e => { S.city = e.target.value; queueSave(); });
+$('#closed').addEventListener('change', e => { S.closed = e.target.checked; save(); });
+$('#btn-geo').addEventListener('click', () => { stopVoice(); geocodeAll(); });
+$('#btn-stop').addEventListener('click', () => { geoCancel = true; });
+$('#btn-gps').addEventListener('click', async () => {
+  setStartStatus('Pegando sua localização…');
+  try {
+    const p = await getPos();
+    S.start = {lat: p.lat, lng: p.lng, label: 'Minha localização'};
+    $('#start-addr').value = ''; save(); renderStart(); renderGeoResult();
+  } catch (e) {
+    setStartStatus('Não consegui acessar a localização. Permita o acesso no navegador ou digite o endereço.', true);
+  }
+});
+
+let resetTimer = null;
+$('#btn-reset').addEventListener('click', e => {
+  const b = e.currentTarget;
+  if (!b.classList.contains('armed')) {
+    b.classList.add('armed'); b.textContent = 'Apagar tudo? Toque de novo';
+    resetTimer = setTimeout(() => { b.classList.remove('armed'); b.textContent = 'Nova rota'; }, 4000);
+    return;
+  }
+  clearTimeout(resetTimer);
+  const cache = S.cache; S = fresh(); S.cache = cache; save(); // guarda só o cache de endereços
+  b.classList.remove('armed'); b.textContent = 'Nova rota';
+  initInputs(); renderAll(); show('import');
+});
+
+function initInputs() {
+  $('#raw').value = S.raw; $('#city').value = S.city; $('#closed').checked = S.closed;
+  $('#start-addr').value = (S.start && S.start.label !== 'Minha localização') ? S.start.label : '';
+  renderStart(); renderGeoResult();
+}
+
+/* ================= entrada por voz ================= */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const voiceBtn = $('#btn-voice'), voiceLive = $('#voice-live');
+const MIC_HTML = voiceBtn.innerHTML, VOICE_HINT = voiceLive.textContent;
+let rec = null, listening = false;
+
+const normSpeech = t => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+function cleanAddress(t) {
+  t = t.replace(/\s+v[ií]rgula\s+/gi, ', ').replace(/\s+,/g, ',').replace(/\s+/g, ' ').trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function setRaw(v) { S.raw = v; $('#raw').value = v; save(); }
+const rawLines = () => S.raw.split('\n').filter(l => l.trim());
+
+function addSpoken(text) {
+  const n = normSpeech(text);
+  if (!n) return;
+  if (/^(apagar|apaga|remover|desfazer) (o )?ultim[oa]$/.test(n)) {
+    const lines = rawLines(), gone = lines.pop();
+    if (gone) { setRaw(lines.join('\n')); toast('Apagado: ' + gone); }
+    return;
+  }
+  if (/^(montar|monte|terminar|terminei|pronto|finalizar)( a)?( rota)?$/.test(n)) {
+    stopVoice(); geocodeAll(); return;
+  }
+  const line = cleanAddress(text);
+  setRaw((S.raw.trim() ? S.raw.replace(/\s+$/, '') + '\n' : '') + line);
+  const ta = $('#raw'); ta.scrollTop = ta.scrollHeight;
+  toast(rawLines().length + '. ' + line);
+}
+function setVoiceUI() {
+  voiceBtn.classList.toggle('rec', listening);
+  voiceBtn.innerHTML = listening ? 'Parar de ouvir' : MIC_HTML;
+  voiceLive.className = 'hint';
+  voiceLive.textContent = listening ? 'Ouvindo… fale o endereço e faça uma pausa.' : VOICE_HINT;
+}
+function startVoice() {
+  if (!SR || listening) return;
+  rec = new SR();
+  rec.lang = 'pt-BR'; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
+  rec.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) addSpoken(r[0].transcript); else interim += r[0].transcript;
+    }
+    voiceLive.textContent = interim ? 'Ouvindo: ' + interim : 'Ouvindo… ' + rawLines().length + ' na lista.';
+  };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      listening = false; setVoiceUI();
+      voiceLive.textContent = 'O navegador bloqueou o microfone. Libere o microfone para este site nas configurações.';
+      voiceLive.className = 'hint bad';
+    }
+  };
+  rec.onend = () => {
+    if (listening) setTimeout(() => { try { rec.start(); } catch (_) {} }, 250); // o navegador encerra sozinho de tempos em tempos
+    else setVoiceUI();
+  };
+  try { rec.start(); listening = true; setVoiceUI(); } catch (e) {}
+}
+function stopVoice() {
+  if (!listening) return;
+  listening = false;
+  try { rec.stop(); } catch (e) {}
+  setVoiceUI();
+}
+if (!SR) {
+  voiceBtn.disabled = true;
+  voiceLive.textContent = 'Este navegador não tem reconhecimento de voz. Use o Chrome (Android) ou o Safari (iPhone) e abra o app por um endereço https.';
+} else {
+  voiceBtn.addEventListener('click', () => listening ? stopVoice() : startVoice());
+}
+
+/* ================= início ================= */
+load();
+initInputs();
+show(S.order.length ? 'route' : 'import');
+window.__rotaFacil = {optimize, hav}; // usado nos testes
+})();
+</script>
+</body>
+</html>
